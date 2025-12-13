@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(gh repo create:*)",
+      "Bash(chmod:*)",
+      "Bash(bash:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(cat:*)",
+      "Bash(~/.claude/hooks/analyze-markdown.sh:*)"
+    ]
+  }
+}
