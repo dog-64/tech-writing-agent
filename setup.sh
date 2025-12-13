@@ -54,7 +54,72 @@ cp tech-writing-agent.md "$INSTALL_DIR/"
 echo -e "${GREEN}  ✓${NC} tech-writing-agent.md"
 
 echo ""
-echo -e "${GREEN}✅ Установка завершена!${NC}"
+echo -e "${GREEN}✅ Установка агента завершена!${NC}"
+echo ""
+
+# Настройка глобальных hooks
+echo -e "${BLUE}⚙️  Настройка глобальных hooks...${NC}"
+echo ""
+
+GLOBAL_SETTINGS="$HOME/.claude/settings.json"
+HOOKS_CONFIG=$(cat <<'HOOKS_EOF'
+{
+  "PostToolUse": [
+    {
+      "matcher": "Write|Edit",
+      "hooks": [
+        {
+          "type": "prompt",
+          "prompt": "Прочитай файл, который только что был создан или изменён. Если это markdown файл (.md) - используя методологию 'Пиши, сокращай' Ильяхова, проанализируй его на:\n\n1. **Стоп-слова**: вводные конструкции (безусловно, разумеется, как правило), неопределённость (некоторый, определённый, целый ряд)\n2. **Заумность**: замени сложные слова простыми (осуществлять→делать, использовать→применять)\n3. **Многословие**: удали лишние слова без потери смысла\n4. **Канцелярит и штампы**: формальные и пустые фразы\n5. **Неясность**: обогащение примерами и конкретикой\n\nЕсли найдены проблемы - дай конкретные рекомендации с примерами. Если файл отличного качества и требует минимальных правок - просто скажи 'Текст в порядке ✓'.\n\nИгнорируй все файлы, которые не являются markdown (.md)."
+        }
+      ]
+    }
+  ]
+}
+HOOKS_EOF
+)
+
+# Создаём ~/.claude директорию если её нет
+mkdir -p "$HOME/.claude"
+
+# Проверяем существование файла settings.json
+if [ ! -f "$GLOBAL_SETTINGS" ]; then
+    # Если файл не существует - создаём с нашей конфигурацией
+    echo -e "${BLUE}📝 Создаю $GLOBAL_SETTINGS...${NC}"
+    echo "{" > "$GLOBAL_SETTINGS"
+    echo "  \"hooks\": $HOOKS_CONFIG" >> "$GLOBAL_SETTINGS"
+    echo "}" >> "$GLOBAL_SETTINGS"
+    echo -e "${GREEN}  ✓${NC} Глобальные hooks установлены"
+else
+    # Если файл существует - пытаемся добавить нашу конфигурацию
+    echo -e "${BLUE}📝 Обновляю $GLOBAL_SETTINGS...${NC}"
+
+    # Проверяем есть ли jq (для работы с JSON)
+    if command -v jq &> /dev/null; then
+        # Проверяем есть ли уже секция hooks
+        if jq -e '.hooks' "$GLOBAL_SETTINGS" > /dev/null 2>&1; then
+            # Есть hooks - объединяем конфигурации
+            TEMP_FILE=$(mktemp)
+            jq ".hooks.PostToolUse |= . + ($HOOKS_CONFIG | .PostToolUse)" "$GLOBAL_SETTINGS" > "$TEMP_FILE"
+            mv "$TEMP_FILE" "$GLOBAL_SETTINGS"
+            echo -e "${GREEN}  ✓${NC} Hooks добавлены к существующей конфигурации"
+        else
+            # Нет hooks - добавляем новую секцию
+            TEMP_FILE=$(mktemp)
+            jq ". + {\"hooks\": $HOOKS_CONFIG}" "$GLOBAL_SETTINGS" > "$TEMP_FILE"
+            mv "$TEMP_FILE" "$GLOBAL_SETTINGS"
+            echo -e "${GREEN}  ✓${NC} Hooks добавлены"
+        fi
+    else
+        # jq не установлен - выводим инструкцию
+        echo -e "${YELLOW}⚠️  jq не найден, не удалось автоматически обновить $GLOBAL_SETTINGS${NC}"
+        echo -e "${BLUE}Добавьте это вручную в $GLOBAL_SETTINGS:${NC}"
+        echo ""
+        echo "$HOOKS_CONFIG" | sed 's/^/  /'
+        echo ""
+    fi
+fi
+
 echo ""
 
 # Проверяем наличие Claude CLI
@@ -82,3 +147,10 @@ fi
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║      ✨ Tech Writing Agent готов к работе!                    ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "${GREEN}✅ Что было сделано:${NC}"
+echo -e "  • Агент установлен в: $INSTALL_DIR"
+echo -e "  • Глобальные hooks настроены в: $GLOBAL_SETTINGS"
+echo -e "  • Все .md файлы будут автоматически проверяться"
+echo ""
+echo -e "${BLUE}💡 Tip:${NC} Hooks работают во ВСЕХ проектах на вашей машине!"
